@@ -1,0 +1,50 @@
+name: Build containers
+
+on:
+  push:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution:
+          - base: quay.io/centos-bootc/fedora-bootc:eln
+            tag: fedora
+          - base: quay.io/centos-bootc/centos-bootc:stream9
+            tag: centos
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Build image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          tags: ${{ matrix.distribution.tag }}
+          containerfiles: Containerfile
+          build-args: |
+            FROM=${{ matrix.distribution.base }}
+
+      - name: Log in to the Container registry
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to GitHub Container Repository
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          tags: ${{ matrix.distribution.tag }}
+          registry: ${{ env.REGISTRY }}
